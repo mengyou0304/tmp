@@ -19,7 +19,7 @@ public class DataSource {
 	DBCollection bfenleiTable;
 
 	public void getConnection() throws UnknownHostException {
-		mongo = new MongoClient("localhost", 27017);
+		mongo = new MongoClient("42.96.157.54", 27017);
 		mongodb = mongo.getDB("mdict");
 		bfenleiTable = mongodb.getCollection("bfenlei");
 	}
