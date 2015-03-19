@@ -34,11 +34,14 @@ public class DataSource {
 		if (table == null)
 			table = bfenleiTable;
 		// 更新一条记录
+		System.out.println("Calling update Message......"+map);
 		BasicDBObject query = new BasicDBObject();
 		query.put("name", name);
 
 		BasicDBObject updatedinfo = new BasicDBObject();
 		for (String key : map.keySet()) {
+			if(key.equals("_id"))
+				continue;
 			String value = map.get(key);
 			updatedinfo.put(key, value);
 		}
@@ -85,10 +88,12 @@ public class DataSource {
 		typs.add("mote");
 		typs.add("dianying");
 		typs.add("yule");
-		for(String key:typs){
-			List<Map> infos = ds.queryInfo(null, "category", key);
-			System.out.println(key+" :"+infos.size());
-		}
+//		for(String key:typs){
+//			List<Map> infos = ds.queryInfo(null, "category", key);
+//			System.out.println(key+" :"+infos.size());
+//		}
+		List<Map> infos = ds.queryInfo(null, "", "");
+		System.out.println(infos.size());
 
 		ds.closeConnection();
 	}

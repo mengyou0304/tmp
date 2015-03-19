@@ -46,12 +46,22 @@ public class AddressbookUI extends UI {
 	/* User interface components are stored in session. */
 	private Table contactList = new Table();
 	private TextField searchField = new TextField();
-	private Button addNewContactButton = new Button("New");
-	private Button removeContactButton = new Button("Remove this contact");
+	private Button newPropertyButton = new Button("New property");
+	private Button saveContactButton = new Button("Save this info");
 	private FormLayout editorLayout = new FormLayout();
 	private FieldGroup editorFields = new FieldGroup();
+	
+	private TextField[] keyfields=new TextField[20];
+	private TextField[] valuefields=new TextField[20];
+	
+	private TextField nameField=null;
+	private static int fieldindexer=-1;
+	private ArrayList<TextField> originFieldList=new ArrayList<TextField>();
+	
+	
 
-	private   String[] fieldNames =null;
+	private String[] fieldNames = null;
+	private DataSource ds;
 
 	/*
 	 * Any component can be bound to an external data source. This example uses
@@ -69,7 +79,6 @@ public class AddressbookUI extends UI {
 		initContactList();
 		initEditor();
 		initSearch();
-		initAddRemoveButtons();
 	}
 
 	/*
@@ -84,13 +93,17 @@ public class AddressbookUI extends UI {
 
 		/* Build the component tree */
 		VerticalLayout leftLayout = new VerticalLayout();
-		splitPanel.addComponent(leftLayout);
-		splitPanel.addComponent(editorLayout);
 		leftLayout.addComponent(contactList);
 		HorizontalLayout bottomLeftLayout = new HorizontalLayout();
 		leftLayout.addComponent(bottomLeftLayout);
 		bottomLeftLayout.addComponent(searchField);
-		bottomLeftLayout.addComponent(addNewContactButton);
+		
+		VerticalLayout rightLayout=new VerticalLayout();
+		rightLayout.addComponent(editorLayout);
+		
+		splitPanel.addComponent(leftLayout);
+		splitPanel.addComponent(rightLayout);
+//		bottomLeftLayout.addComponent(addNewContactButton);
 
 		/* Set the contents in the left of the split panel to use all the space */
 		leftLayout.setSizeFull();
@@ -117,21 +130,60 @@ public class AddressbookUI extends UI {
 	}
 
 	private void initEditor() {
-
-		editorLayout.addComponent(removeContactButton);
-
+		HorizontalLayout thout=new HorizontalLayout ();
+		
+		thout.addComponent(saveContactButton);
+		thout.addComponent(newPropertyButton);
+		editorLayout.addComponent(thout);
+		
 		/* User interface can be created dynamically to reflect underlying data. */
 		for (String fieldName : fieldNames) {
 			TextField field = new TextField(fieldName);
+			originFieldList.add(field);
+			if(fieldName.equals("name"))
+				nameField=field;
 			editorLayout.addComponent(field);
 			field.setWidth("100%");
-
 			/*
 			 * We use a FieldGroup to connect multiple components to a data
 			 * source at once.
 			 */
 			editorFields.bind(field, fieldName);
 		}
+		
+		newPropertyButton.addClickListener(new ClickListener() {
+			public void buttonClick(ClickEvent event) {
+				fieldindexer++;
+				keyfields[fieldindexer]=new TextField("key");
+				valuefields[fieldindexer]=new TextField("value");
+				HorizontalLayout hout=new HorizontalLayout ();
+				hout.addComponent(keyfields[fieldindexer]);
+				hout.addComponent(valuefields[fieldindexer]);
+				editorLayout.addComponent(hout);
+			}
+		});
+		
+		saveContactButton.addClickListener(new ClickListener() {
+			@Override
+			public void buttonClick(ClickEvent event) {
+				HashMap<String,String> map=new HashMap<String,String>();
+				map.put("name", nameField.getValue());
+				System.out.println("info from nameField: "+nameField.getValue());
+				System.out.println("keyfields.length: "+keyfields.length);
+				for(int i=0;i<=fieldindexer;i++){
+					if(keyfields[i]==null)
+						continue;
+					String ks=keyfields[i].getValue();
+					String vs=valuefields[i].getValue();
+					map.put(ks, vs);
+//					System.out.println("key: "+ks+" /t value: "+vs);
+				}
+				for(TextField field: originFieldList)
+					map.put(field.getCaption(), field.getValue());
+				ds.updateInfo(null, nameField.getValue(), map);
+				
+			}
+		});
 
 		/*
 		 * Data can be buffered in the user interface. When doing so, commit()
@@ -189,9 +241,9 @@ public class AddressbookUI extends UI {
 		}
 
 		public boolean passesFilter(Object itemId, Item item) {
-			String haystack = ("" + item.getItemProperty("category").getValue()
+			String haystack = ("" + item.getItemProperty("source").getValue()
 					+ item.getItemProperty("name").getValue() + item
-					.getItemProperty("labels").getValue()).toLowerCase();
+					.getItemProperty("category").getValue()).toLowerCase();
 			return haystack.contains(needle);
 		}
 
@@ -200,19 +252,11 @@ public class AddressbookUI extends UI {
 		}
 	}
 
-	private void initAddRemoveButtons() {
-
-		removeContactButton.addClickListener(new ClickListener() {
-			public void buttonClick(ClickEvent event) {
-				Object contactId = contactList.getValue();
-				contactList.removeItem(contactId);
-			}
-		});
-	}
 
 	private void initContactList() {
 		contactList.setContainerDataSource(contactContainer);
-		contactList.setVisibleColumns(new String[] { "category", "name", "labels" });
+		contactList.setVisibleColumns(new String[] { "source", "name",
+				"category" });
 		contactList.setSelectable(true);
 		contactList.setImmediate(true);
 
@@ -229,7 +273,7 @@ public class AddressbookUI extends UI {
 				if (contactId != null)
 					editorFields.setItemDataSource(contactList
 							.getItem(contactId));
-				
+
 				editorLayout.setVisible(contactId != null);
 			}
 		});
@@ -240,59 +284,39 @@ public class AddressbookUI extends UI {
 	 * we could be using SQLContainer, JPAContainer or some other to persist the
 	 * data.
 	 */
-	private  IndexedContainer createDummyDatasource() {
-		List<Map> infolist=getFromMongo(1);
-		
+	private IndexedContainer createDummyDatasource() {
+		List<Map> infolist = getAllFromMongo();
 		IndexedContainer ic = new IndexedContainer();
 		for (String p : fieldNames) {
 			ic.addContainerProperty(p, String.class, "");
 		}
 		/* Create dummy data by randomly combining first and last names */
-		for(Map map: infolist){
+		for (Map map : infolist) {
 			Object id = ic.addItem();
-			for(String p:fieldNames){
-				String key=p;
-				String value=String.valueOf(map.get(key));
+			for (String p : fieldNames) {
+				String key = p;
+				String value = String.valueOf(map.get(key));
 				ic.getContainerProperty(id, key).setValue(value);
 			}
 		}
 		return ic;
 	}
-	public  List<Map> getFromMongo(int i){
-		DataSource ds = new DataSource();
+
+	public List<Map> getAllFromMongo() {
+		ds = new DataSource();
 		try {
 			ds.getConnection();
 		} catch (UnknownHostException e) {
 			e.printStackTrace();
 		}
-		ArrayList<String> typs=new ArrayList<String>();
-		typs.add("yanyuan");
-		typs.add("geshou");
-		typs.add("mingxing");
-		typs.add("daoyan");
-		typs.add("zhuchiren");
-		typs.add("mote");
-		typs.add("dianying");
-		typs.add("yule");
-		List<Map> infos = ds.queryInfo(null, "category", typs.get(i%typs.size()));
-		Set<String> keyset=new HashSet<String>();
-		for(Map map:infos)
+		List<Map> infos = ds.queryInfo(null, "", "");
+		Set<String> keyset = new HashSet<String>();
+		for (Map map : infos)
 			keyset.addAll(map.keySet());
-		fieldNames=new String[keyset.size()];
-		int j=0;
-		for(String key:keyset)
-			fieldNames[j++]=key;
+		fieldNames = new String[keyset.size()];
+		int j = 0;
+		for (String key : keyset)
+			fieldNames[j++] = key;
 		return infos;
 	}
-	public static HashMap<String,String> initfiles(){
-		HashMap<String,String> map=new HashMap<String,String>();
-		String s=FileUtility.readFromFile("/Application/nla/log_pick/file1.txt");
-		String[] ss=s.split("\n");
-		for(String line:ss){
-			String[] dd=line.split("=");
-			map.put(dd[0], dd[1]);
-		}
-		return map;
-	}
-
 }
