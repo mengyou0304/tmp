@@ -19,8 +19,10 @@ public class DataSource {
 	DBCollection bfenleiTable;
 
 	public void getConnection() throws UnknownHostException {
-		mongo = new MongoClient("42.96.157.54", 27017);
-		mongodb = mongo.getDB("mdict");
+		mongo = new MongoClient("111.204.165.5", 27017);
+		mongodb = mongo.getDB("my_dict");
+		String pass="my_dict.Pwd2";
+		mongodb.authenticate("my_dict", pass.toCharArray());
 		bfenleiTable = mongodb.getCollection("bfenlei");
 	}
 
